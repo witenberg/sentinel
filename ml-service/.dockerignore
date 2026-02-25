@@ -1,0 +1,38 @@
+# Virtual env and caches (installed in container)
+venv
+.venv
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Env (inject at runtime)
+.env
+.env.*
+!.env.example
+
+# Tests (not needed in image)
+tests
+*.spec.py
+pytest.ini
+pyproject.toml
+conftest.py
+
+# Docs and misc
+README.md
+*.md
+.DS_Store
+Dockerfile*
+.dockerignore

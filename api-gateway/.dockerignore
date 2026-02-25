@@ -1,0 +1,41 @@
+# Dependencies (installed in container)
+node_modules
+.pnpm-store
+
+# Build output (rebuilt in container)
+dist
+build
+.next
+out
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs and env (inject at runtime)
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
+# Tests and coverage (not needed in image)
+coverage
+.nyc_output
+*.spec.ts
+*.e2e-spec.ts
+test
+jest.config.js
+jest-e2e.json
+
+# Docs and misc
+README.md
+*.md
+.DS_Store
+Dockerfile*
+.dockerignore

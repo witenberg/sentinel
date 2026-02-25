@@ -1,0 +1,41 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Główna tabela zadania
+model AnalysisJob {
+  id            String     @id @default(uuid())
+  filename      String
+  totalLines    Int
+  incidentCount Int
+  status        String
+  createdAt     DateTime   @default(now())
+
+  incidents     Incident[] 
+}
+
+// Nowa tabela przechowująca zagregowane incydenty
+model Incident {
+  id               String      @id @default(uuid())
+  
+  jobId            String
+  job              AnalysisJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  incidentTemplate String      // Szablon z DRAIN (np. "Failed password for <*>")
+  occurrences      Int         // Ile razy wystąpił w pliku
+  avgScore         Float       // Średni wynik anomalii (Isolation Forest)
+  severity         Float       // Wynik z reguł (FATAL, ERROR)
+  exampleLog       String      // Przykładowa surowa linia logu
+}

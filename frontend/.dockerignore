@@ -1,0 +1,32 @@
+# Dependencies (installed in container)
+node_modules
+.pnpm-store
+
+# Build output (rebuilt in container)
+.next
+out
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Env (inject at runtime)
+.env
+.env.*
+!.env.example
+
+# Debug and logs
+npm-debug.log*
+*.log
+
+# Misc
+README.md
+*.md
+.DS_Store
+Dockerfile*
+.dockerignore

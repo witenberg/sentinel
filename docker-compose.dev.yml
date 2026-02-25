@@ -1,0 +1,45 @@
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: sentinel_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Cache and statuses
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management-alpine # Version with GUI
+    ports:
+      - "5672:5672"   # Port for application (Node/Python)
+      - "15672:15672" # Port for GUI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+  
+  # Storage (log files)
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"   # Port API (for Node/Python)
+      - "9001:9001"   # Port for GUI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:

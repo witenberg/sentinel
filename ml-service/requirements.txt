@@ -1,0 +1,15 @@
+scikit-learn
+pandas
+numpy
+pika
+boto3
+python-dotenv
+sqlalchemy
+psycopg2-binary
+python-dateutil
+drain3
+pytest
+testcontainers
+moto
+structlog
+colorama
