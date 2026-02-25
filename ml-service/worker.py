@@ -32,32 +32,12 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
-# --- Config ---
-RABBIT_URL = os.getenv("RABBITMQ_URL")
-JOBS_QUEUE_NAME = os.getenv("RABBITMQ_JOBS_QUEUE")
-RESULTS_QUEUE_NAME = os.getenv("RABBITMQ_RESULTS_QUEUE")
-
-# S3 (MinIO)
-s3_client = boto3.client(
-    's3',
-    endpoint_url=os.getenv("S3_ENDPOINT"),
-    aws_access_key_id=os.getenv("S3_ACCESS_KEY"),
-    aws_secret_access_key=os.getenv("S3_SECRET_KEY"),
-    region_name=os.getenv("S3_REGION")
-)
-
-# PostgreSQL
-DB_URL = os.getenv("DATABASE_URL")
-if DB_URL.startswith("postgres://"):
-    DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
-# Strip schema= from DSN (psycopg2 doesn't support it; schema in SQL)
-if "?" in DB_URL:
-    parts = DB_URL.split("?", 1)
-    params = "&".join(p for p in parts[1].split("&") if not p.lower().startswith("schema="))
-    DB_URL = parts[0] + ("?" + params if params else "")
-
-# Engine is long-lived; SQLAlchemy uses connection pooling by default (connections returned to pool on conn.close()).
-db_engine = create_engine(DB_URL)
+# Runtime dependencies (initialized at startup, not at import time)
+RABBIT_URL = None
+JOBS_QUEUE_NAME = None
+RESULTS_QUEUE_NAME = None
+s3_client = None
+db_engine = None
 
 # Thread pool for long-running analysis; ack/notify run on connection thread via add_callback_threadsafe
 _analysis_executor = ThreadPoolExecutor(max_workers=1)
@@ -74,6 +54,40 @@ def validate_env():
         logger.error("Missing required environment variables", missing=missing)
         sys.exit(1)
 
+
+def _normalize_database_url(db_url: str | None) -> str:
+    """Normalize SQLAlchemy DSN and drop unsupported schema query param."""
+    if not db_url:
+        raise RuntimeError("Missing DATABASE_URL")
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    if "?" in db_url:
+        parts = db_url.split("?", 1)
+        params = "&".join(p for p in parts[1].split("&") if not p.lower().startswith("schema="))
+        db_url = parts[0] + ("?" + params if params else "")
+    return db_url
+
+
+def init_runtime_from_env():
+    """Initialize clients and runtime config from environment variables."""
+    global RABBIT_URL, JOBS_QUEUE_NAME, RESULTS_QUEUE_NAME, s3_client, db_engine
+
+    RABBIT_URL = os.getenv("RABBITMQ_URL")
+    JOBS_QUEUE_NAME = os.getenv("RABBITMQ_JOBS_QUEUE")
+    RESULTS_QUEUE_NAME = os.getenv("RABBITMQ_RESULTS_QUEUE")
+
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=os.getenv("S3_ENDPOINT"),
+        aws_access_key_id=os.getenv("S3_ACCESS_KEY"),
+        aws_secret_access_key=os.getenv("S3_SECRET_KEY"),
+        region_name=os.getenv("S3_REGION"),
+    )
+
+    db_url = _normalize_database_url(os.getenv("DATABASE_URL"))
+    # Engine is long-lived; SQLAlchemy uses connection pooling by default.
+    db_engine = create_engine(db_url)
+
 def with_retry(func, *args, max_retries=3, base_delay=2, **kwargs):
     """Execute function with exponential backoff on errors."""
     for attempt in range(1, max_retries + 1):
@@ -89,6 +103,9 @@ def with_retry(func, *args, max_retries=3, base_delay=2, **kwargs):
 
 def wait_for_dependencies():
     """Pause worker startup until all external services are available."""
+    if db_engine is None or s3_client is None:
+        raise RuntimeError("Runtime is not initialized. Call init_runtime_from_env() first.")
+
     logger.info("Waiting for dependencies to start...")
     
     # Check PostgreSQL
@@ -238,6 +255,9 @@ def process_message(ch, method, properties, body):
 
 
 def start_worker():
+    if not RABBIT_URL or not JOBS_QUEUE_NAME or not RESULTS_QUEUE_NAME:
+        raise RuntimeError("Runtime is not initialized. Call init_runtime_from_env() first.")
+
     logger.info("Connecting to RabbitMQ")
     params = pika.URLParameters(RABBIT_URL)
 
@@ -254,6 +274,7 @@ def start_worker():
 
 if __name__ == "__main__":
     validate_env()
+    init_runtime_from_env()
     wait_for_dependencies()
     try:
         start_worker()
