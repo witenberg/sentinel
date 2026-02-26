@@ -47,7 +47,12 @@ _analysis_executor = ThreadPoolExecutor(max_workers=1)
 
 def validate_env():
     """Fail-Fast: Exit if critical environment variables are missing."""
-    required_vars = ["RABBITMQ_URL", "S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "DATABASE_URL"]
+    required_vars = ["RABBITMQ_URL", "DATABASE_URL"]
+
+
+    if not is_production:
+        required_vars.extend(["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY"])   # Required for local development
+
     missing = [var for var in required_vars if not os.getenv(var)]
     
     if missing:
@@ -76,13 +81,18 @@ def init_runtime_from_env():
     JOBS_QUEUE_NAME = os.getenv("RABBITMQ_JOBS_QUEUE")
     RESULTS_QUEUE_NAME = os.getenv("RABBITMQ_RESULTS_QUEUE")
 
-    s3_client = boto3.client(
-        "s3",
-        endpoint_url=os.getenv("S3_ENDPOINT"),
-        aws_access_key_id=os.getenv("S3_ACCESS_KEY"),
-        aws_secret_access_key=os.getenv("S3_SECRET_KEY"),
-        region_name=os.getenv("S3_REGION"),
-    )
+    boto3_kwargs = {
+        "region_name": os.getenv("S3_REGION", "us-east-1")
+    }
+    
+    if not is_production:
+        boto3_kwargs.update({
+            "endpoint_url": os.getenv("S3_ENDPOINT"),
+            "aws_access_key_id": os.getenv("S3_ACCESS_KEY"),
+            "aws_secret_access_key": os.getenv("S3_SECRET_KEY"),
+        })
+    
+    s3_client = boto3.client("s3", **boto3_kwargs)
 
     db_url = _normalize_database_url(os.getenv("DATABASE_URL"))
     # Engine is long-lived; SQLAlchemy uses connection pooling by default.
