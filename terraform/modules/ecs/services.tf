@@ -148,9 +148,9 @@ resource "aws_ecs_task_definition" "api_migrate" {
 
   container_definitions = jsonencode([{
     name      = "api-migrate"
-    image     = var.api_gateway_image
+    image     = var.api_migrate_image
     essential = true
-    command   = ["sh", "-c", "npx prisma migrate deploy"]
+    command   = ["sh", "-c", "pnpm exec prisma migrate deploy"]
 
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },

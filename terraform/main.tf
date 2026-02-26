@@ -131,6 +131,7 @@ module "ecs" {
 
   frontend_image    = "${module.ecr.frontend_repository_url}:latest"
   api_gateway_image = "${module.ecr.api_gateway_repository_url}:latest"
+  api_migrate_image = "${module.ecr.api_gateway_repository_url}:migrator-latest"
   ml_service_image  = "${module.ecr.ml_service_repository_url}:latest"
 
   frontend_target_group_arn    = module.alb.frontend_target_group_arn

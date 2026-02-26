@@ -104,6 +104,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build and push API Migrator
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api-gateway
+          file: ./api-gateway/Dockerfile
+          target: migrator
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/api-gateway:migrator-${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/api-gateway:migrator-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Build and push ML Service
         uses: docker/build-push-action@v5
         with:

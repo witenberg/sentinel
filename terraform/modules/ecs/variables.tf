@@ -39,6 +39,10 @@ variable "api_gateway_image" {
   type = string
 }
 
+variable "api_migrate_image" {
+  type = string
+}
+
 variable "ml_service_image" {
   type = string
 }
