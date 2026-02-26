@@ -1,0 +1,33 @@
+# Copy to terraform.tfvars and adjust values before applying.
+
+project_name = "sentinel"
+environment  = "production"
+aws_region   = "us-east-1"
+
+# Networking (2 AZs – minimum for ALB)
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# RDS PostgreSQL (db.t3.micro = Free Tier eligible)
+rds_instance_class    = "db.t3.micro"
+rds_allocated_storage = 20
+
+# ECS Fargate task sizing (minimal – single instance each)
+frontend_cpu           = 256
+frontend_memory        = 512
+frontend_desired_count = 1
+
+api_gateway_cpu           = 256
+api_gateway_memory        = 512
+api_gateway_desired_count = 1
+
+ml_service_cpu           = 512
+ml_service_memory        = 1024
+ml_service_desired_count = 1
+
+# Domain & TLS (optional – leave commented out to use plain ALB DNS over HTTP)
+# domain_name         = "sentinel.example.com"
+# acm_certificate_arn = "arn:aws:acm:us-east-1:123456789:certificate/abc-def-123"
+
+# CI/CD – GitHub Actions OIDC
+github_repository = "your-username/sentinel"
