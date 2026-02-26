@@ -7,7 +7,12 @@ on:
       - main
 
 env:
-  REGISTRY: ghcr.io
+  AWS_REGION: us-east-1
+  NAME_PREFIX: sentinel-production
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   test-api-gateway:
@@ -39,15 +44,6 @@ jobs:
 
   test-ml-service:
     runs-on: ubuntu-latest
-    env:
-      RABBITMQ_URL: amqp://guest:guest@localhost:5672/
-      RABBITMQ_JOBS_QUEUE: jobs
-      RABBITMQ_RESULTS_QUEUE: results
-      S3_ENDPOINT: http://localhost:9000
-      S3_ACCESS_KEY: test
-      S3_SECRET_KEY: test
-      S3_REGION: us-east-1
-      DATABASE_URL: postgresql://test:test@localhost:5432/test_db
 
     steps:
       - name: Checkout repository
@@ -68,7 +64,7 @@ jobs:
         working-directory: ./ml-service
         run: pytest -q
 
-  build-and-push:
+  deploy:
     runs-on: ubuntu-latest
     needs:
       - test-api-gateway
@@ -76,57 +72,104 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
+      id-token: write
       contents: read
-      packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Log in to the Container registry
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Lowercase repository owner
-        id: repo_owner
-        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build and push API Gateway
       - name: Build and push API Gateway
         uses: docker/build-push-action@v5
         with:
           context: ./api-gateway
           file: ./api-gateway/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.repo_owner.outputs.owner }}/sentinel-api:latest
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/api-gateway:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/api-gateway:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Build and push ML Service
       - name: Build and push ML Service
         uses: docker/build-push-action@v5
         with:
           context: ./ml-service
           file: ./ml-service/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.repo_owner.outputs.owner }}/sentinel-ml:latest
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/ml-service:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/ml-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Build and push Frontend
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.repo_owner.outputs.owner }}/sentinel-front:latest
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/frontend:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Run database migrations
+        run: |
+          NETWORK_CONFIG=$(aws ecs describe-services \
+            --cluster "${{ env.NAME_PREFIX }}-cluster" \
+            --services "${{ env.NAME_PREFIX }}-api-gateway" \
+            --query 'services[0].networkConfiguration' --output json)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "${{ env.NAME_PREFIX }}-cluster" \
+            --task-definition "${{ env.NAME_PREFIX }}-api-migrate" \
+            --launch-type FARGATE \
+            --network-configuration "$NETWORK_CONFIG" \
+            --query 'tasks[0].taskArn' --output text)
+
+          echo "Waiting for migration task: $TASK_ARN"
+          aws ecs wait tasks-stopped \
+            --cluster "${{ env.NAME_PREFIX }}-cluster" --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${{ env.NAME_PREFIX }}-cluster" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Database migration failed (exit code $EXIT_CODE)"
+            exit 1
+          fi
+
+      - name: Deploy ECS services
+        run: |
+          for SERVICE in frontend api-gateway ml-service; do
+            aws ecs update-service \
+              --cluster "${{ env.NAME_PREFIX }}-cluster" \
+              --service "${{ env.NAME_PREFIX }}-${SERVICE}" \
+              --force-new-deployment \
+              --query 'service.serviceName' --output text
+          done
+
+      - name: Wait for deployments to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ env.NAME_PREFIX }}-cluster" \
+            --services \
+              "${{ env.NAME_PREFIX }}-frontend" \
+              "${{ env.NAME_PREFIX }}-api-gateway" \
+              "${{ env.NAME_PREFIX }}-ml-service"
