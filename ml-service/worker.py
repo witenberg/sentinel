@@ -125,10 +125,13 @@ def wait_for_dependencies():
     logger.info("Pinging PostgreSQL")
     with_retry(ping_db, max_retries=5, base_delay=3)
 
-    # Check S3 (MinIO)
+    # Check S3 access for the configured data bucket (least-privilege friendly).
     def ping_s3():
-        s3_client.list_buckets()
-    logger.info("Pinging S3 (MinIO)")
+        bucket = os.getenv("S3_BUCKET")
+        if not bucket:
+            raise RuntimeError("Missing S3_BUCKET")
+        s3_client.head_bucket(Bucket=bucket)
+    logger.info("Pinging S3 bucket access")
     with_retry(ping_s3, max_retries=5, base_delay=3)
     
     logger.info("All dependencies are up and running!")
