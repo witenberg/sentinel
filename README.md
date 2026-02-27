@@ -54,3 +54,8 @@ docker compose -f docker-compose.demo.yml up --build
 ```bash
 docker compose -f docker-compose.demo.yml down
 ```
+
+## TODO
+
+- Align database TLS settings across `api-gateway` and `ml-service` to a single production standard.
+- Replace transitional DB SSL compatibility handling with full certificate verification (`verify-full`/`verify-ca`) and explicit CA bundle configuration in both runtimes.

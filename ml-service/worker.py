@@ -68,7 +68,18 @@ def _normalize_database_url(db_url: str | None) -> str:
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     if "?" in db_url:
         parts = db_url.split("?", 1)
-        params = "&".join(p for p in parts[1].split("&") if not p.lower().startswith("schema="))
+        normalized_params: list[str] = []
+        for param in parts[1].split("&"):
+            lower = param.lower()
+            if lower.startswith("schema="):
+                continue
+            # psycopg2/libpq doesn't support sslmode=no-verify.
+            # Keep TLS enabled while using a libpq-compatible mode.
+            if lower == "sslmode=no-verify":
+                normalized_params.append("sslmode=require")
+                continue
+            normalized_params.append(param)
+        params = "&".join(normalized_params)
         db_url = parts[0] + ("?" + params if params else "")
     return db_url
 
