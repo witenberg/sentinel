@@ -209,7 +209,7 @@ resource "aws_ecs_service" "frontend" {
   health_check_grace_period_seconds  = 60
 
   lifecycle {
-    ignore_changes = [desired_count, task_definition]
+    ignore_changes = [desired_count]
   }
 }
 
@@ -246,7 +246,7 @@ resource "aws_ecs_service" "api_gateway" {
   health_check_grace_period_seconds  = 90
 
   lifecycle {
-    ignore_changes = [desired_count, task_definition]
+    ignore_changes = [desired_count]
   }
 }
 
@@ -276,6 +276,6 @@ resource "aws_ecs_service" "ml_service" {
   deployment_minimum_healthy_percent = 100
 
   lifecycle {
-    ignore_changes = [desired_count, task_definition]
+    ignore_changes = [desired_count]
   }
 }
