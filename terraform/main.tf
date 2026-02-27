@@ -149,7 +149,7 @@ module "ecs" {
   ml_service_memory        = var.ml_service_memory
   ml_service_desired_count = var.ml_service_desired_count
 
-  database_url = "postgresql://sentinel:${random_password.db_password.result}@${module.rds.endpoint}/sentinel_db?schema=public&sslmode=require"
+  database_url = "postgresql://sentinel:${random_password.db_password.result}@${module.rds.endpoint}/sentinel_db?schema=public&sslmode=no-verify"
 
   rabbitmq_url  = aws_mq_broker.rabbitmq.instances[0].endpoints[0]
   rabbitmq_user = "sentinel"
