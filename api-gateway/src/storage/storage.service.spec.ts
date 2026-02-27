@@ -11,7 +11,7 @@ jest.mock('uuid', () => ({
 
 describe('StorageService', () => {
   let service: StorageService;
-  let configService: jest.Mocked<Pick<ConfigService, 'getOrThrow'>>;
+  let configService: jest.Mocked<Pick<ConfigService, 'getOrThrow' | 'get'>>;
   let s3SendSpy: jest.SpyInstance;
 
   const mockFile: Express.Multer.File = {
@@ -28,17 +28,19 @@ describe('StorageService', () => {
   };
 
   beforeEach(async () => {
-    const mockConfigService: Pick<ConfigService, 'getOrThrow'> = {
+    const configEnv: Record<string, string> = {
+      S3_BUCKET: 'test-bucket',
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_REGION: 'us-east-1',
+      S3_ACCESS_KEY: 'test-access',
+      S3_SECRET_KEY: 'test-secret',
+    };
+
+    const mockConfigService: Pick<ConfigService, 'getOrThrow' | 'get'> = {
       getOrThrow: jest.fn((key: string) => {
-        const configEnv: Record<string, string> = {
-          S3_BUCKET: 'test-bucket',
-          S3_ENDPOINT: 'http://localhost:9000',
-          S3_REGION: 'us-east-1',
-          S3_ACCESS_KEY: 'test-access',
-          S3_SECRET_KEY: 'test-secret',
-        };
         return configEnv[key] ?? '';
       }),
+      get: jest.fn((key: string) => configEnv[key]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -52,7 +54,7 @@ describe('StorageService', () => {
     }).compile();
 
     service = module.get<StorageService>(StorageService);
-    configService = module.get(ConfigService) as unknown as jest.Mocked<Pick<ConfigService, 'getOrThrow'>>;
+    configService = module.get(ConfigService) as unknown as jest.Mocked<Pick<ConfigService, 'getOrThrow' | 'get'>>;
 
     s3SendSpy = jest.spyOn(S3Client.prototype, 'send').mockResolvedValue({
       $metadata: { httpStatusCode: 200 },
@@ -68,8 +70,9 @@ describe('StorageService', () => {
   describe('Initialization', () => {
     it('should correctly initialize S3Client with configuration values', () => {
       expect(configService.getOrThrow).toHaveBeenCalledWith('S3_BUCKET');
-      expect(configService.getOrThrow).toHaveBeenCalledWith('S3_ENDPOINT');
-      expect(configService.getOrThrow).toHaveBeenCalledWith('S3_ACCESS_KEY');
+      expect(configService.get).toHaveBeenCalledWith('S3_ENDPOINT');
+      expect(configService.get).toHaveBeenCalledWith('S3_ACCESS_KEY');
+      expect(configService.get).toHaveBeenCalledWith('S3_SECRET_KEY');
     });
   });
 
