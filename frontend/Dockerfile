@@ -7,8 +7,8 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # NEXT_PUBLIC_* variables are embedded into client bundle at build time.
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
-ARG NEXT_PUBLIC_WS_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
 

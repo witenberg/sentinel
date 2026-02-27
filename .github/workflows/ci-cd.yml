@@ -134,6 +134,9 @@ jobs:
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
+          build-args: |
+            NEXT_PUBLIC_API_URL=/api/v1
+            NEXT_PUBLIC_WS_URL=
           push: true
           tags: |
             ${{ steps.ecr-login.outputs.registry }}/${{ env.NAME_PREFIX }}/frontend:${{ github.sha }}

@@ -5,15 +5,10 @@ import axios from "axios";
 import { io, Socket } from "socket.io-client";
 import { Job, JobUpdatePayload } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (() => {
-    try {
-        const parsed = new URL(API_URL);
-        return `${parsed.protocol}//${parsed.host}`;
-    } catch {
-        return "http://localhost:3001";
-    }
-})();
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+const WS_URL =
+    process.env.NEXT_PUBLIC_WS_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "");
 
 export default function Dashboard() {
     const [jobs, setJobs] = useState<Job[]>([]);
