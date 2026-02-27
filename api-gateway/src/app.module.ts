@@ -77,9 +77,26 @@ import { Logger } from '@nestjs/common';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const redisUrl = configService.getOrThrow<string>('REDIS_URL');
-
         const logger = new Logger(ThrottlerModule.name);
+        const redisUrl = configService.get<string>('REDIS_URL');
+
+        const throttlers = [
+          {
+            name: 'default',
+            ttl: seconds(60),
+            limit: 10,
+          },
+          {
+            name: 'upload',
+            ttl: seconds(60),
+            limit: 5,
+          },
+        ];
+
+        if (!redisUrl) {
+          logger.warn('REDIS_URL is not set, using in-memory throttler storage');
+          return { throttlers };
+        }
 
         const redisClient = new Redis(redisUrl, {
           retryStrategy: () => null,
@@ -91,18 +108,7 @@ import { Logger } from '@nestjs/common';
         });
 
         return {
-          throttlers: [
-            {
-              name: 'default',
-              ttl: seconds(60),
-              limit: 10,
-            },
-            {
-              name: 'upload',
-              ttl: seconds(60),
-              limit: 5,
-            },
-          ],
+          throttlers,
           storage: new ThrottlerStorageRedisService(redisClient),
         };
       },

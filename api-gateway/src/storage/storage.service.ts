@@ -11,29 +11,38 @@ export class StorageService implements OnModuleInit {
 
     constructor(private readonly configService: ConfigService) {
         this.bucketName = this.configService.getOrThrow<string>('S3_BUCKET');
-        this.s3Client = new S3Client({
-            endpoint: this.configService.getOrThrow<string>('S3_ENDPOINT'),
-            region: this.configService.getOrThrow<string>('S3_REGION'),
-            credentials: {
-                accessKeyId: this.configService.getOrThrow<string>('S3_ACCESS_KEY'),
-                secretAccessKey: this.configService.getOrThrow<string>('S3_SECRET_KEY'),
-            },
+        const endpoint = this.configService.get<string>('S3_ENDPOINT');
+        const accessKeyId = this.configService.get<string>('S3_ACCESS_KEY');
+        const secretAccessKey = this.configService.get<string>('S3_SECRET_KEY');
 
-            forcePathStyle: true,
+        const s3Config: ConstructorParameters<typeof S3Client>[0] = {
+            region: this.configService.getOrThrow<string>('S3_REGION'),
             requestHandler: {
                 requestTimeout: 30000,
                 connectionTimeout: 5000,
             },
-        });
+        };
+
+        if (endpoint) {
+            // MinIO/local setup.
+            s3Config.endpoint = endpoint;
+            s3Config.forcePathStyle = true;
+        }
+
+        if (accessKeyId && secretAccessKey) {
+            s3Config.credentials = { accessKeyId, secretAccessKey };
+        }
+
+        this.s3Client = new S3Client(s3Config);
     }
 
     async onModuleInit() {
         try {
             await this.s3Client.send(new HeadBucketCommand({ Bucket: this.bucketName }));
-            this.logger.log(`Connected to S3/MinIO bucket: ${this.bucketName}`);
+            this.logger.log(`Connected to S3 bucket: ${this.bucketName}`);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            throw new Error(`Failed to connect to S3/MinIO bucket "${this.bucketName}": ${message}`);
+            throw new Error(`Failed to connect to S3 bucket "${this.bucketName}": ${message}`);
         }
     }
 

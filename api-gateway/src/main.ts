@@ -32,8 +32,14 @@ async function bootstrap() {
     );
 
     const redisIoAdapter = new RedisIoAdapter(app, configService);
-    await redisIoAdapter.connectToRedis();
-    app.useWebSocketAdapter(redisIoAdapter);
+    const redisUrl = configService.get<string>('REDIS_URL');
+
+    if (redisUrl) {
+      await redisIoAdapter.connectToRedis();
+      app.useWebSocketAdapter(redisIoAdapter);
+    } else {
+      logger.warn('REDIS_URL is not set, using default Socket.IO adapter');
+    }
 
     process.on('SIGTERM', async () => {
       logger.log('SIGTERM received, starting graceful shutdown...');
